@@ -6,3 +6,5 @@
 ^Meta$
 ^README\.Rmd$
 ^\.github$
+^docs$
+^suffolk_est_twoyears_demos\.dta$
