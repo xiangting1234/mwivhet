@@ -20,7 +20,7 @@ handling the centering of instruments within each block."><!-- mathjax --><scrip
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">mwivhet</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.0.0.9000</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.1</span>
       </span>
     </div>
 
@@ -101,9 +101,16 @@ Defaults to <code>FALSE</code>.</p></dd>
 $$S = \sum_{s} e_s' [ U(P_{Q,s}) - U(P_{W,s}) ] X_s$$</p>
 <p>Within each stratum \(s\):</p><ul><li><p>\(P_{Q,s}\) is the projection onto the instrument groups.</p></li>
 <li><p>\(P_{W,s}\) is the projection onto the stratum intercept (local mean).</p></li>
-<li><p>\(U(P)\) denotes the projection with diagonal elements removed and inverse-diagonal rescaling.</p></li>
+<li><p>\(U(P)\) denotes the projection matrix with its diagonal elements removed,
+rescaled by the inverse of the annihilator diagonal \((1 - P_{ii})^{-1}\).</p></li>
 </ul><p>This corresponds to the numerator terms (\(P_{XY}, P_{XX}\)) for test inversion in
 designs with discrete controls.</p>
+<p><strong>Algorithmic Implementation:</strong>
+To ensure high performance and low memory overhead on large datasets, this function computes
+the projection transformation \(G_s X_s\) using strictly \(O(N)\) vector operations.
+It computes group means via optimized aggregation, derives the diagonal leverage adjustments
+inline, and directly applies the leave-one-out transformation without ever constructing
+the dense \(N \times N\) projection matrices.</p>
     </div>
     <div id="references">
     <h2>References</h2>
