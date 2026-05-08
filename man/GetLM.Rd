@@ -37,11 +37,19 @@ Within each stratum \eqn{s}:
 \itemize{
 \item \eqn{P_{Q,s}} is the projection onto the instrument groups.
 \item \eqn{P_{W,s}} is the projection onto the stratum intercept (local mean).
-\item \eqn{U(P)} denotes the projection with diagonal elements removed and inverse-diagonal rescaling.
+\item \eqn{U(P)} denotes the projection matrix with its diagonal elements removed,
+rescaled by the inverse of the annihilator diagonal \eqn{(1 - P_{ii})^{-1}}.
 }
 
 This corresponds to the numerator terms (\eqn{P_{XY}, P_{XX}}) for test inversion in
 designs with discrete controls.
+
+\strong{Algorithmic Implementation:}
+To ensure high performance and low memory overhead on large datasets, this function computes
+the projection transformation \eqn{G_s X_s} using strictly \eqn{O(N)} vector operations.
+It computes group means via optimized aggregation, derives the diagonal leverage adjustments
+inline, and directly applies the leave-one-out transformation without ever constructing
+the dense \eqn{N \times N} projection matrices.
 }
 \references{
 Yap, L. (2025). "Inference with Many Weak Instruments and Heterogeneity". Working Paper.

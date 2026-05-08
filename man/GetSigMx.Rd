@@ -29,13 +29,26 @@ Numeric vector of length 6. Contains \code{c(sig11, sig22, sig33, sig12, sig23, 
 }
 \description{
 Estimates the joint variance-covariance matrix of the three core quadratic forms used in
-UJIVE/LIML estimation: \eqn{Y'GY}, \eqn{X'GY}, and \eqn{X'GX}.
+UJIVE/LIML estimation: \eqn{Y'GY}, \eqn{X'GY}, and \eqn{X'GX}. This function is highly
+optimized for large-scale datasets by leveraging block-diagonal geometries and scalar algebra.
 }
 \details{
 The function estimates the covariance components for the vector of quadratic forms:
 \deqn{\Psi = [Y'GY, \quad X'GY, \quad X'GX]^T}
 
-The returned vector contains the unique elements of the covariance matrix \eqn{\Sigma_\Psi}:
+\strong{Algorithmic Implementation:}
+To achieve high performance, the function processes the data using a two-level nested loop
+over covariate strata (\code{groupW}) and instrument groups (\code{group}).
+The heavy \eqn{N \times N} geometry matrices (such as the projection matrix \eqn{P}, the
+leverage-adjusted weight matrix \eqn{G}, and the residual variance matrix \eqn{D_2}) are
+pre-computed exactly once per stratum.
+
+Within each instrument group, the function relies on localized extraction and exact scalar
+algebra sub-routines (via \eqn{A_1} and \eqn{A_4} component helpers) to evaluate the
+leave-three-out (L3O) variance interactions. This approach minimizes computational complexity
+to \eqn{O(N)} at the group level and completely eliminates redundant matrix allocations and inversions.
+
+The returned vector contains the unique elements of the symmetric covariance matrix \eqn{\Sigma_\Psi}:
 \itemize{
 \item \code{sig11}: \eqn{Var(Y'GY)}
 \item \code{sig22}: \eqn{Var(X'GY)}

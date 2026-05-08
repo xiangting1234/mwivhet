@@ -33,7 +33,8 @@ Numeric vector of length 3: \code{c(a, b, c)}.
 \description{
 Estimates the coefficients \eqn{a}, \eqn{b}, and \eqn{c} for the quadratic inequality
 \eqn{a\beta^2 + b\beta + c \le 0}, which defines the \eqn{1-\alpha} confidence set for the
-structural parameter \eqn{\beta}. Designed for grouped instrument structures with covariates.
+structural parameter \eqn{\beta}. This function is highly optimized for large-scale datasets,
+relying on block-diagonal geometries and scalar algebra.
 }
 \details{
 The confidence set is constructed by inverting a test statistic based on the quadratic form
@@ -41,14 +42,26 @@ The confidence set is constructed by inverting a test statistic based on the qua
 The coefficients are derived from the variance estimator \eqn{\hat{V}(\beta)} of this quadratic form,
 decomposed into interactions between the outcome and the regressor.
 
+\strong{Algorithmic Implementation:}
+To achieve high performance, the function processes the data using a two-level nested loop
+over covariate strata (\code{groupW}) and instrument groups (\code{group}).
+The heavy \eqn{N \times N} geometry matrices (such as the projection matrices \eqn{P}, \eqn{M},
+and the leverage-adjusted weight matrix \eqn{G}) are pre-computed exactly once per stratum.
+
+Furthermore, the target inner products (\eqn{P_{XY}} and \eqn{P_{XX}}) are aggregated inline
+during the stratum loop to avoid redundant passes over the data. Within each instrument group,
+unique Leave-Three-Out (L3O) variance interactions (\eqn{A_1} and \eqn{A_4} terms) are evaluated
+using exact scalar algebra helpers. This approach minimizes computational complexity
+to \eqn{O(N)} at the group level and completely eliminates redundant matrix allocations.
+
 The returned coefficients correspond to:
 \deqn{a = P_{XX}^2 - q \cdot C_2}
 \deqn{b = -2 P_{XY} P_{XX} - q \cdot C_1}
 \deqn{c = P_{XY}^2 - q \cdot C_0}
 
 Where \eqn{P_{XY}} and \eqn{P_{XX}} are the UJIVE estimators for the cross-products, and
-\eqn{C_0, C_1, C_2} are the corresponding variance components computed via L3O adjustment.
+\eqn{C_0, C_1, C_2} are the variance components compiled via the L3O adjustment framework.
 }
 \references{
-Yap, L. (2025). "Inference with Many Weak Instruments and Heterogeneity".
+Yap, L. (2025). "Inference with Many Weak Instruments and Heterogeneity". Working Paper.
 }
