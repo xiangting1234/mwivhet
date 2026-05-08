@@ -36,8 +36,8 @@
 #' @references
 #' Yap, L. (2025). "Inference with Many Weak Instruments and Heterogeneity".
 #'
-#' @export
-GetCIcoef <- function(df, groupW, group, X, Y, MX, MY, q = qnorm(.975)^2, noisy = FALSE) {
+#' @noRd
+GetCIcoef_old <- function(df, groupW, group, X, Y, MX, MY, q = qnorm(.975)^2, noisy = FALSE) {
   df$X <- eval(substitute(X), df)
   df$Y <- eval(substitute(Y), df)
   df$MX <- eval(substitute(MX), df)
@@ -108,8 +108,8 @@ GetCIcoef <- function(df, groupW, group, X, Y, MX, MY, q = qnorm(.975)^2, noisy 
 #' @references
 #' Yap, L. (2025). "Inference with Many Weak Instruments and Heterogeneity". Working Paper.
 #'
-#' @export
-GetSigMx <- function(df, groupW, group, X, Y, MX, MY, noisy = FALSE) {
+#' @noRd
+GetSigMx_old <- function(df, groupW, group, X, Y, MX, MY, noisy = FALSE) {
   df$X <- eval(substitute(X), df)
   df$Y <- eval(substitute(Y), df)
   df$MX <- eval(substitute(MX), df)
@@ -1141,8 +1141,8 @@ GetLM_WQ <- function(df, IdPW, IdPQ, dPW, dPQ, W, Q, X, Y) {
 #' @references
 #' Yap, L. (2025). "Inference with Many Weak Instruments and Heterogeneity". Working Paper.
 #'
-#' @export
-GetLM <- function(df, X, e, groupW, group, noisy = FALSE) {
+#' @noRd
+GetLM_old <- function(df, X, e, groupW, group, noisy = FALSE) {
   LMvecs <- rep(0, max(df$groupW))
   df$Xpos <- eval(substitute(X), df)
   df$epos <- eval(substitute(e), df)
@@ -1229,4 +1229,530 @@ GetLM_nocov <- function(df, X, e, groupZ, noisy = FALSE) {
     }
   }
   sum(LMvecs)
+}
+
+#' Compute Covariance Matrix of UJIVE Quadratic Forms
+#'
+#' @description
+#' Estimates the joint variance-covariance matrix of the three core quadratic forms used in
+#' UJIVE/LIML estimation: \eqn{Y'GY}, \eqn{X'GY}, and \eqn{X'GX}. This function is highly
+#' optimized for large-scale datasets by leveraging block-diagonal geometries and scalar algebra.
+#'
+#' @param df Data frame. Contains the variables used in estimation.
+#' @param groupW Column name (unquoted). The covariate stratification variable.
+#' @param group Column name (unquoted). The instrument grouping variable.
+#' @param X Column name (unquoted). The endogenous regressor.
+#' @param Y Column name (unquoted). The outcome variable.
+#' @param MX Column name (unquoted). Leverage-adjusted regressor (\eqn{M X}).
+#' @param MY Column name (unquoted). Leverage-adjusted outcome (\eqn{M Y}).
+#' @param noisy Logical. If \code{TRUE}, prints progress during variance component calculation.
+#'   Defaults to \code{FALSE}.
+#'
+#' @details
+#' The function estimates the covariance components for the vector of quadratic forms:
+#' \deqn{\Psi = [Y'GY, \quad X'GY, \quad X'GX]^T}
+#'
+#' \strong{Algorithmic Implementation:}
+#' To achieve high performance, the function processes the data using a two-level nested loop
+#' over covariate strata (\code{groupW}) and instrument groups (\code{group}).
+#' The heavy \eqn{N \times N} geometry matrices (such as the projection matrix \eqn{P}, the
+#' leverage-adjusted weight matrix \eqn{G}, and the residual variance matrix \eqn{D_2}) are
+#' pre-computed exactly once per stratum.
+#'
+#' Within each instrument group, the function relies on localized extraction and exact scalar
+#' algebra sub-routines (via \eqn{A_1} and \eqn{A_4} component helpers) to evaluate the
+#' leave-three-out (L3O) variance interactions. This approach minimizes computational complexity
+#' to \eqn{O(N)} at the group level and completely eliminates redundant matrix allocations and inversions.
+#'
+#' The returned vector contains the unique elements of the symmetric covariance matrix \eqn{\Sigma_\Psi}:
+#' \itemize{
+#'   \item \code{sig11}: \eqn{Var(Y'GY)}
+#'   \item \code{sig22}: \eqn{Var(X'GY)}
+#'   \item \code{sig33}: \eqn{Var(X'GX)}
+#'   \item \code{sig12}: \eqn{Cov(Y'GY, X'GY)}
+#'   \item \code{sig23}: \eqn{Cov(X'GY, X'GX)}
+#'   \item \code{sig13}: \eqn{Cov(Y'GY, X'GX)}
+#' }
+#'
+#' @return Numeric vector of length 6. Contains \code{c(sig11, sig22, sig33, sig12, sig23, sig13)}.
+#'
+#' @references
+#' Yap, L. (2025). "Inference with Many Weak Instruments and Heterogeneity". Working Paper.
+#'
+#' @export
+GetSigMx <- function(df, groupW, group, X, Y, MX, MY, noisy = FALSE) {
+
+  # 1. Evaluation
+  df$X <- eval(substitute(X), df)
+  df$Y <- eval(substitute(Y), df)
+  df$MX <- eval(substitute(MX), df)
+  df$MY <- eval(substitute(MY), df)
+  df$groupW <- eval(substitute(groupW), df)
+  df$group <- eval(substitute(group), df)
+
+  s11_val <- s22_val <- s33_val <- 0
+  s12_val <- s23_val <- s13_val <- 0
+  iteration <- 1
+
+  # 2. Outer Loop (Covariate Blocks)
+  for (s in unique(df$groupW)) {
+    ds <- df[df$groupW == s, ]
+    ds$numingrp <- 0
+    for (j in unique(ds$group)) ds$numingrp[ds$group == j] <- sum(ds$group == j)
+    ds <- ds[ds$numingrp >= 3, ]
+
+    if (nrow(ds) > 0) {
+      N <- nrow(ds)
+
+      # Block Pre-computation
+      ZQ <- matrix(0, nrow = N, ncol = length(unique(ds$group)))
+      ds$groupidx <- as.integer(factor(ds$group))
+      ZQ[cbind(seq_len(N), ds$groupidx)] <- 1
+      PQ <- ZQ %*% solve(t(ZQ) %*% ZQ) %*% t(ZQ)
+
+      ZWmat <- matrix(1, nrow = length(ds$groupW), ncol = length(ds$groupW))
+      PW <- ZWmat / (length(ds$groupW))
+
+      Gs <- diag(1 / (diag(diag(N)) - pmin(diag(PQ), .999))) %*% (PQ - diag(diag(PQ))) -
+        diag(1 / (diag(diag(N)) - pmin(diag(PW), .999))) %*% (PW - diag(diag(PW)))
+
+      Ps <- PQ
+      Ms <- diag(N) - Ps
+      dMs <- matrix(diag(Ms), ncol = 1)
+      D2s <- dMs %*% t(dMs) - Ms * Ms
+      recD2s <- 1 / D2s
+      diag(recD2s) <- 0
+
+      recD2sGs2Pgs_base <- recD2s * Gs^2
+      Gs2MsrecD2sPgs_base <- Gs^2 * Ms * recD2s
+
+      vX <- ds$X; vY <- ds$Y; vMX <- ds$MX; vMY <- ds$MY
+
+      # 3. Inner Loop (Instrument Groups)
+      for (g in unique(ds$group)) {
+        idx_g <- which(ds$group == g)
+
+        if (length(idx_g) > 3) {
+          repidx <- idx_g[1]
+
+          # Group Vectors
+          Pis <- matrix(Ps[, repidx], ncol = 1)
+          Pgs <- ifelse(Pis == 0, 0, 1) %*% matrix(1, ncol = length(Pis), nrow = 1)
+
+          # Gis[j] stands for G[i', j] for any i' in the instrument group g.
+          # Claim 3 (Appendix H.1 rewrite): within a Q-group, G[i', j] is the
+          # same constant g_g for every i' in g and any fixed j in g, j != i'.
+          # G[repidx, repidx] = 0 by UJIVE construction, so we must overwrite
+          # that entry with the in-group off-diagonal value g_g. Any other
+          # element of the group works; idx_g[2] is guaranteed to be a valid
+          # in-group neighbour regardless of how rows of `ds` are ordered.
+          # (The original form `Gis[repidx + 1]` silently assumes that `ds`
+          #  stores rows of the same instrument group contiguously.)
+          Gis <- matrix(Gs[, repidx], ncol = 1)
+          Gis[repidx, 1] <- Gis[idx_g[2], 1]
+
+          # Mis is defined as -Ps[, repidx], i.e., the repidx column of -P.
+          # Away from the repidx row, this coincides with M[, repidx]. At the
+          # repidx row itself, Mis[repidx] = -P[repidx, repidx] differs from
+          # the true M[repidx, repidx] = 1 - P[repidx, repidx] by exactly -1.
+          # This offset is DELIBERATE: it makes the downstream D3is matrix
+          # satisfy the identity
+          #   D3is[repidx, k] = D_{i', repidx, k}  for every i' in idx_g \ {repidx, k}
+          # (Lemma in Appendix H.4.1 of the rewrite), so a single D3is built
+          # from repidx correctly encodes the per-i weight for every outer i
+          # in the group, including at the repidx row/column.
+          Mis <- matrix(-Ps[, repidx], ncol = 1)
+
+          # Determinant Matrices
+          D3is <- Ms[repidx, repidx] * D2s - (dMs %*% t(Mis)^2 + Mis^2 %*% t(dMs) - 2 * Ms * (Mis %*% t(Mis)))
+          recD3is <- 1 / D3is
+          diag(recD3is) <- 0
+          D2D3is <- D2s / D3is
+          diag(D2D3is) <- 0
+
+          # Pre-multiply Ms into weights
+          D2D3is_Ms <- D2D3is * Ms
+          recD3is_Ms <- recD3is * Ms
+          recD3is_Ms2 <- recD3is_Ms * Ms
+
+          recD2is <- matrix(recD2s[, repidx], ncol = 1)
+          # Same rationale as the Gis fix-up: use idx_g[2] rather than
+          # repidx + 1 so that correctness does not depend on row ordering.
+          recD2is[repidx, 1] <- recD2is[idx_g[2], 1]
+          Gis2 <- Gis^2
+
+          recD2sGs2Pgs <- recD2sGs2Pgs_base * Pgs
+          Gs2MsrecD2sPgs <- Gs2MsrecD2sPgs_base * Pgs
+
+          # --- Call External Helpers ---
+          s11_val <- s11_val + (4 * compute_A1_scalar_ext(vY, vY, vY, vMY, idx_g, Gis, Mis, dMs, D2D3is, recD3is, recD3is_Ms, recD2sGs2Pgs, Gs2MsrecD2sPgs)
+                                - 2 * compute_A4_scalar_ext(vY, vY, vY, vMY, idx_g, Gis2, Mis, dMs, recD2is, D2D3is, D2D3is_Ms, recD3is, recD3is_Ms, recD3is_Ms2, recD2sGs2Pgs))
+
+          s33_val <- s33_val + (4 * compute_A1_scalar_ext(vX, vX, vX, vMX, idx_g, Gis, Mis, dMs, D2D3is, recD3is, recD3is_Ms, recD2sGs2Pgs, Gs2MsrecD2sPgs)
+                                - 2 * compute_A4_scalar_ext(vX, vX, vX, vMX, idx_g, Gis2, Mis, dMs, recD2is, D2D3is, D2D3is_Ms, recD3is, recD3is_Ms, recD3is_Ms2, recD2sGs2Pgs))
+
+          s22_val <- s22_val + (compute_A1_scalar_ext(vY, vX, vX, vMY, idx_g, Gis, Mis, dMs, D2D3is, recD3is, recD3is_Ms, recD2sGs2Pgs, Gs2MsrecD2sPgs)
+                                + 2*compute_A1_scalar_ext(vY, vX, vY, vMX, idx_g, Gis, Mis, dMs, D2D3is, recD3is, recD3is_Ms, recD2sGs2Pgs, Gs2MsrecD2sPgs)
+                                + compute_A1_scalar_ext(vX, vY, vY, vMX, idx_g, Gis, Mis, dMs, D2D3is, recD3is, recD3is_Ms, recD2sGs2Pgs, Gs2MsrecD2sPgs)
+                                - compute_A4_scalar_ext(vY, vX, vY, vMX, idx_g, Gis2, Mis, dMs, recD2is, D2D3is, D2D3is_Ms, recD3is, recD3is_Ms, recD3is_Ms2, recD2sGs2Pgs)
+                                - compute_A4_scalar_ext(vY, vY, vX, vMX, idx_g, Gis2, Mis, dMs, recD2is, D2D3is, D2D3is_Ms, recD3is, recD3is_Ms, recD3is_Ms2, recD2sGs2Pgs))
+
+          # 12, 23, 13
+          s12_val <- s12_val + (compute_A1_scalar_ext(vX, vY, vY, vMY, idx_g, Gis, Mis, dMs, D2D3is, recD3is, recD3is_Ms, recD2sGs2Pgs, Gs2MsrecD2sPgs)
+                                + 3*compute_A1_scalar_ext(vY, vX, vY, vMY, idx_g, Gis, Mis, dMs, D2D3is, recD3is, recD3is_Ms, recD2sGs2Pgs, Gs2MsrecD2sPgs)
+                                + compute_A4_scalar_ext(vX, vY, vY, vMY, idx_g, Gis2, Mis, dMs, recD2is, D2D3is, D2D3is_Ms, recD3is, recD3is_Ms, recD3is_Ms2, recD2sGs2Pgs)
+                                - 3*compute_A4_scalar_ext(vY, vX, vY, vMY, idx_g, Gis2, Mis, dMs, recD2is, D2D3is, D2D3is_Ms, recD3is, recD3is_Ms, recD3is_Ms2, recD2sGs2Pgs))
+
+          s23_val <- s23_val + (compute_A1_scalar_ext(vX, vX, vX, vMY, idx_g, Gis, Mis, dMs, D2D3is, recD3is, recD3is_Ms, recD2sGs2Pgs, Gs2MsrecD2sPgs)
+                                + 3*compute_A1_scalar_ext(vX, vX, vY, vMX, idx_g, Gis, Mis, dMs, D2D3is, recD3is, recD3is_Ms, recD2sGs2Pgs, Gs2MsrecD2sPgs)
+                                + compute_A4_scalar_ext(vX, vX, vX, vMY, idx_g, Gis2, Mis, dMs, recD2is, D2D3is, D2D3is_Ms, recD3is, recD3is_Ms, recD3is_Ms2, recD2sGs2Pgs)
+                                - 3*compute_A4_scalar_ext(vX, vX, vY, vMX, idx_g, Gis2, Mis, dMs, recD2is, D2D3is, D2D3is_Ms, recD3is, recD3is_Ms, recD3is_Ms2, recD2sGs2Pgs))
+
+          s13_val <- s13_val + (4*compute_A1_scalar_ext(vX, vX, vY, vMY, idx_g, Gis, Mis, dMs, D2D3is, recD3is, recD3is_Ms, recD2sGs2Pgs, Gs2MsrecD2sPgs)
+                                - 2*compute_A4_scalar_ext(vX, vX, vY, vMY, idx_g, Gis2, Mis, dMs, recD2is, D2D3is, D2D3is_Ms, recD3is, recD3is_Ms, recD3is_Ms2, recD2sGs2Pgs))
+        }
+      }
+    }
+    if (noisy) { cat(iteration, "of", length(unique(df$groupW)), "done.\n"); iteration <- iteration + 1 }
+  }
+  c(s11_val, s22_val, s33_val, s12_val, s23_val, s13_val)
+}
+
+#' Compute Quadratic Coefficients for Confidence Sets (Grouped Data)
+#'
+#' @description
+#' Estimates the coefficients \eqn{a}, \eqn{b}, and \eqn{c} for the quadratic inequality
+#' \eqn{a\beta^2 + b\beta + c \le 0}, which defines the \eqn{1-\alpha} confidence set for the
+#' structural parameter \eqn{\beta}. This function is highly optimized for large-scale datasets,
+#' relying on block-diagonal geometries and scalar algebra.
+#'
+#' @param df Data frame. Contains the observable variables and their projections.
+#' @param groupW Column name (unquoted). The covariate stratification variable.
+#' @param group Column name (unquoted). The instrument grouping variable.
+#' @param X Column name (unquoted). The endogenous regressor.
+#' @param Y Column name (unquoted). The outcome variable.
+#' @param MX Column name (unquoted). Leverage-adjusted regressor (\eqn{M X}).
+#' @param MY Column name (unquoted). Leverage-adjusted outcome (\eqn{M Y}).
+#' @param q Numeric scalar. Critical value for the test statistic inversion (e.g., \eqn{\chi^2_{1, 1-\alpha}}).
+#'   Defaults to \code{qnorm(.975)^2} (approx. 3.84) for a 95 percent confidence interval.
+#' @param noisy Logical. If \code{TRUE}, prints progress dots during calculation.
+#'   Defaults to \code{FALSE}.
+#'
+#' @details
+#' The confidence set is constructed by inverting a test statistic based on the quadratic form
+#' \eqn{Q(\beta) = (\mathbf{Y} - \beta \mathbf{X})' G (\mathbf{Y} - \beta \mathbf{X})}.
+#' The coefficients are derived from the variance estimator \eqn{\hat{V}(\beta)} of this quadratic form,
+#' decomposed into interactions between the outcome and the regressor.
+#'
+#' \strong{Algorithmic Implementation:}
+#' To achieve high performance, the function processes the data using a two-level nested loop
+#' over covariate strata (\code{groupW}) and instrument groups (\code{group}).
+#' The heavy \eqn{N \times N} geometry matrices (such as the projection matrices \eqn{P}, \eqn{M},
+#' and the leverage-adjusted weight matrix \eqn{G}) are pre-computed exactly once per stratum.
+#'
+#' Furthermore, the target inner products (\eqn{P_{XY}} and \eqn{P_{XX}}) are aggregated inline
+#' during the stratum loop to avoid redundant passes over the data. Within each instrument group,
+#' unique Leave-Three-Out (L3O) variance interactions (\eqn{A_1} and \eqn{A_4} terms) are evaluated
+#' using exact scalar algebra helpers. This approach minimizes computational complexity
+#' to \eqn{O(N)} at the group level and completely eliminates redundant matrix allocations.
+#'
+#' The returned coefficients correspond to:
+#' \deqn{a = P_{XX}^2 - q \cdot C_2}
+#' \deqn{b = -2 P_{XY} P_{XX} - q \cdot C_1}
+#' \deqn{c = P_{XY}^2 - q \cdot C_0}
+#'
+#' Where \eqn{P_{XY}} and \eqn{P_{XX}} are the UJIVE estimators for the cross-products, and
+#' \eqn{C_0, C_1, C_2} are the variance components compiled via the L3O adjustment framework.
+#'
+#' @return Numeric vector of length 3: \code{c(a, b, c)}.
+#'
+#' @references
+#' Yap, L. (2025). "Inference with Many Weak Instruments and Heterogeneity". Working Paper.
+#'
+#' @export
+GetCIcoef <- function(df, groupW, group, X, Y, MX, MY,
+                           q = qnorm(.975)^2, noisy = FALSE) {
+
+  # 1. Evaluation  --------------------------------------------------------
+  df$X      <- eval(substitute(X),      df)
+  df$Y      <- eval(substitute(Y),      df)
+  df$MX     <- eval(substitute(MX),     df)
+  df$MY     <- eval(substitute(MY),     df)
+  df$groupW <- eval(substitute(groupW), df)
+  df$group  <- eval(substitute(group),  df)
+
+  # Accumulators for the ten distinct A1/A4 scalars that appear across
+  # C0, C1, C2. Naming: a1_ijkl / a4_ijkl with i,j,k in {X,Y} and l in
+  # {MX,MY}. We only instantiate the ones actually needed.
+  a1_YXX_MY <- 0; a1_YXY_MX <- 0; a1_XYY_MX <- 0     # C0 A1 terms
+  a4_XYX_MY <- 0; a4_YYX_MX <- 0                     # C0 A4 terms
+
+  a1_XXX_MY <- 0; a1_XXY_MX <- 0; a1_YXX_MX <- 0; a1_XYX_MX <- 0  # C1 A1 terms
+  a4_XXX_MY <- 0; a4_XYX_MX <- 0; a4_YXX_MX <- 0                  # C1 A4 terms
+
+  a1_XXX_MX <- 0; a4_XXX_MX <- 0                                  # C2 terms
+
+  # GetLM accumulators: PXY = sum_s y' Gs x,   PXX = sum_s x' Gs x
+  PXY <- 0
+  PXX <- 0
+
+  iteration <- 1
+
+  # 2. Outer Loop (Covariate Blocks)  -------------------------------------
+  for (s in unique(df$groupW)) {
+    ds <- df[df$groupW == s, ]
+    ds$numingrp <- 0
+    for (j in unique(ds$group)) ds$numingrp[ds$group == j] <- sum(ds$group == j)
+    ds <- ds[ds$numingrp >= 4, ]
+
+    if (nrow(ds) > 0) {
+      N <- nrow(ds)
+
+      # Block Pre-computation  (identical to GetSigMx_fast)
+      ZQ <- matrix(0, nrow = N, ncol = length(unique(ds$group)))
+      ds$groupidx <- as.integer(factor(ds$group))
+      ZQ[cbind(seq_len(N), ds$groupidx)] <- 1
+      PQ <- ZQ %*% solve(t(ZQ) %*% ZQ) %*% t(ZQ)
+
+      ZWmat <- matrix(1, nrow = length(ds$groupW), ncol = length(ds$groupW))
+      PW <- ZWmat / (length(ds$groupW))
+
+      Gs <- diag(1 / (diag(diag(N)) - pmin(diag(PQ), .99))) %*% (PQ - diag(diag(PQ))) -
+        diag(1 / (diag(diag(N)) - pmin(diag(PW), .99))) %*% (PW - diag(diag(PW)))
+
+      Ps  <- PQ
+      Ms  <- diag(N) - Ps
+      dMs <- matrix(diag(Ms), ncol = 1)
+      D2s <- dMs %*% t(dMs) - Ms * Ms
+      recD2s <- 1 / D2s
+      diag(recD2s) <- 0
+
+      recD2sGs2Pgs_base  <- recD2s * Gs^2
+      Gs2MsrecD2sPgs_base <- Gs^2 * Ms * recD2s
+
+      vX <- ds$X; vY <- ds$Y; vMX <- ds$MX; vMY <- ds$MY
+
+      # GetLM contribution from this block: y' Gs x  and  x' Gs x
+      # (drop(...) guarantees a scalar even though R would otherwise
+      # return a 1x1 matrix.)
+      Gs_vX <- Gs %*% vX
+      PXY <- PXY + drop(crossprod(vY, Gs_vX))
+      PXX <- PXX + drop(crossprod(vX, Gs_vX))
+
+      # 3. Inner Loop (Instrument Groups)  --------------------------------
+      for (g in unique(ds$group)) {
+        idx_g <- which(ds$group == g)
+
+        if (length(idx_g) > 3) {
+          repidx <- idx_g[1]
+
+          # Group Vectors
+          Pis <- matrix(Ps[, repidx], ncol = 1)
+          Pgs <- ifelse(Pis == 0, 0, 1) %*% matrix(1, ncol = length(Pis), nrow = 1)
+
+          # Gis fix-up: overwrite the structural zero at the repidx row
+          # with the in-group off-diagonal constant. Using idx_g[2]
+          # (rather than repidx+1) makes this independent of row order
+          # within the dataframe.
+          Gis <- matrix(Gs[, repidx], ncol = 1)
+          Gis[repidx, 1] <- Gis[idx_g[2], 1]
+
+          # Mis = -Ps[,repidx]; the -1 offset at the repidx row is
+          # deliberate so that D3is encodes per-i weights for every
+          # outer i in the group (see Appendix H.4.1 of the rewrite).
+          Mis <- matrix(-Ps[, repidx], ncol = 1)
+
+          # Determinant Matrices
+          D3is <- Ms[repidx, repidx] * D2s -
+            (dMs %*% t(Mis)^2 + Mis^2 %*% t(dMs) - 2 * Ms * (Mis %*% t(Mis)))
+          recD3is <- 1 / D3is
+          diag(recD3is) <- 0
+          D2D3is <- D2s / D3is
+          diag(D2D3is) <- 0
+
+          # Pre-multiply Ms into weights
+          D2D3is_Ms    <- D2D3is * Ms
+          recD3is_Ms   <- recD3is * Ms
+          recD3is_Ms2  <- recD3is_Ms * Ms
+
+          recD2is <- matrix(recD2s[, repidx], ncol = 1)
+          recD2is[repidx, 1] <- recD2is[idx_g[2], 1]
+          Gis2 <- Gis^2
+
+          recD2sGs2Pgs    <- recD2sGs2Pgs_base    * Pgs
+          Gs2MsrecD2sPgs  <- Gs2MsrecD2sPgs_base  * Pgs
+
+          # Bundle args so each A1 / A4 call stays readable
+          a1 <- function(i, j, k, l) {
+            compute_A1_scalar_ext(i, j, k, l, idx_g,
+                                  Gis, Mis, dMs,
+                                  D2D3is, recD3is, recD3is_Ms,
+                                  recD2sGs2Pgs, Gs2MsrecD2sPgs)
+          }
+          a4 <- function(i, j, k, l) {
+            compute_A4_scalar_ext(i, j, k, l, idx_g,
+                                  Gis2, Mis, dMs, recD2is,
+                                  D2D3is, D2D3is_Ms,
+                                  recD3is, recD3is_Ms, recD3is_Ms2,
+                                  recD2sGs2Pgs)
+          }
+
+          # --- C0 contributions -----------------------------------------
+          a1_YXX_MY <- a1_YXX_MY + a1(vY, vX, vX, vMY)
+          a1_YXY_MX <- a1_YXY_MX + a1(vY, vX, vY, vMX)
+          a1_XYY_MX <- a1_XYY_MX + a1(vX, vY, vY, vMX)
+          a4_XYX_MY <- a4_XYX_MY + a4(vX, vY, vX, vMY)
+          a4_YYX_MX <- a4_YYX_MX + a4(vY, vY, vX, vMX)
+
+          # --- C1 contributions -----------------------------------------
+          # Note the reference computes two of these terms twice (with
+          # coefficients 2 and 1); we collect each term once and apply
+          # the combined coefficient (3) at the end.
+          a1_XXX_MY <- a1_XXX_MY + a1(vX, vX, vX, vMY)
+          a1_XXY_MX <- a1_XXY_MX + a1(vX, vX, vY, vMX)
+          a1_YXX_MX <- a1_YXX_MX + a1(vY, vX, vX, vMX)
+          a1_XYX_MX <- a1_XYX_MX + a1(vX, vY, vX, vMX)
+          a4_XXX_MY <- a4_XXX_MY + a4(vX, vX, vX, vMY)
+          a4_XYX_MX <- a4_XYX_MX + a4(vX, vY, vX, vMX)
+          a4_YXX_MX <- a4_YXX_MX + a4(vY, vX, vX, vMX)
+
+          # --- C2 contributions -----------------------------------------
+          a1_XXX_MX <- a1_XXX_MX + a1(vX, vX, vX, vMX)
+          a4_XXX_MX <- a4_XXX_MX + a4(vX, vX, vX, vMX)
+        }
+      }
+    }
+    if (noisy) {
+      cat(iteration, "of", length(unique(df$groupW)), "done.\n")
+      iteration <- iteration + 1
+    }
+  }
+
+  # 4. Assemble C0, C1, C2  ------------------------------------------------
+  C0 <-  a1_YXX_MY + 2 * a1_YXY_MX + a1_XYY_MX -
+    a4_XYX_MY - a4_YYX_MX
+
+  C1 <- -( a1_XXX_MY +
+             3 * a1_XXY_MX -                 # coeffs 2 + 1 in the reference
+             a4_XXX_MY - a4_XYX_MX +
+             3 * a1_YXX_MX +                 # coeffs 1 + 2 in the reference
+             a1_XYX_MX -
+             a4_XYX_MX - a4_YXX_MX )
+
+  C2 <- 4 * a1_XXX_MX - 2 * a4_XXX_MX
+
+  # 5. Final coefficients  -------------------------------------------------
+  acon <-  PXX^2        - q * C2
+  bcon <- -2 * PXY * PXX - q * C1
+  ccon <-  PXY^2        - q * C0
+
+  c(acon, bcon, ccon)
+}
+
+
+
+#' Compute UJIVE Signal Component (Stratified Design)
+#'
+#' @description
+#' Calculates the UJIVE "signal" or cross-product term \eqn{X' G e} for a design where
+#' instruments are nested within discrete covariate strata (e.g., Judges within Years).
+#' This function iterates through covariate groups to compute the quadratic form locally,
+#' handling the centering of instruments within each block.
+#'
+#' @param df Data frame. Contains the observable variables and grouping indicators.
+#' @param X Column name (unquoted). The first variable (e.g., endogenous regressor).
+#' @param e Column name (unquoted). The second variable (e.g., outcome or residual).
+#' @param groupW Column name (unquoted). The covariate stratification variable (defines blocks).
+#' @param group Column name (unquoted). The instrument grouping variable (defines treatments).
+#' @param noisy Logical. If \code{TRUE}, prints progress of the stratum iteration.
+#'   Defaults to \code{FALSE}.
+#'
+#' @details
+#' This function implements the estimator for the signal component \eqn{S} in a stratified design:
+#' \deqn{S = \sum_{s} e_s' [ U(P_{Q,s}) - U(P_{W,s}) ] X_s}
+#'
+#' Within each stratum \eqn{s}:
+#' \itemize{
+#'   \item \eqn{P_{Q,s}} is the projection onto the instrument groups.
+#'   \item \eqn{P_{W,s}} is the projection onto the stratum intercept (local mean).
+#'   \item \eqn{U(P)} denotes the projection matrix with its diagonal elements removed,
+#'   rescaled by the inverse of the annihilator diagonal \eqn{(1 - P_{ii})^{-1}}.
+#' }
+#'
+#' This corresponds to the numerator terms (\eqn{P_{XY}, P_{XX}}) for test inversion in
+#' designs with discrete controls.
+#'
+#' \strong{Algorithmic Implementation:}
+#' To ensure high performance and low memory overhead on large datasets, this function computes
+#' the projection transformation \eqn{G_s X_s} using strictly \eqn{O(N)} vector operations.
+#' It computes group means via optimized aggregation, derives the diagonal leverage adjustments
+#' inline, and directly applies the leave-one-out transformation without ever constructing
+#' the dense \eqn{N \times N} projection matrices.
+#'
+#' @return Numeric scalar. The sum of stratum-specific quadratic forms.
+#'
+#' @references
+#' Yap, L. (2025). "Inference with Many Weak Instruments and Heterogeneity". Working Paper.
+#'
+#' @export
+GetLM <- function(df, X, e, groupW, group, noisy = FALSE) {
+
+  df$Xpos   <- eval(substitute(X),      df)
+  df$epos   <- eval(substitute(e),      df)
+  df$groupW <- eval(substitute(groupW), df)
+  df$group  <- eval(substitute(group),  df)
+
+  total     <- 0
+  uniqW     <- unique(df$groupW)
+  iteration <- 1L
+
+  for (s in uniqW) {
+    idx_s <- which(df$groupW == s)
+    N     <- length(idx_s)
+    if (N == 0L) next
+
+    x  <- df$Xpos[idx_s]
+    ev <- df$epos[idx_s]
+
+    # --- Instrument-group structure within this W block --------------------
+    gvec   <- df$group[idx_s]
+    gfac   <- factor(gvec)                 # stable mapping to 1..J
+    gidx   <- as.integer(gfac)             # length N, values in 1..J
+    nj     <- tabulate(gidx)               # group sizes, length J
+    n_i    <- nj[gidx]                     # group size for each row, length N
+
+    # --- Group means of x -------------------------------------------------
+    # sum_j = sum of x over rows with group index j; length J
+    sum_j  <- as.numeric(tapply(x, gidx, sum))
+    # If a group is empty in this block it won't appear in gidx; tapply
+    # returns length = length(unique(gidx)) in the order of sort(unique(gidx))
+    # which equals 1..J here because gidx was built from factor(). So
+    # sum_j is aligned with 1..J by construction.
+    PQx_i  <- (sum_j / nj)[gidx]           # (PQ x)_i,  length N
+
+    # --- diag(PQ) and diag(PW) with the .99 clamp -------------------------
+    dPQ_i  <- 1 / n_i                      # diag(PQ) for each row
+    dPW    <- 1 / N                        # scalar, same for every row
+    dPQ_c  <- pmin(dPQ_i, .99)
+    dPW_c  <- min(dPW,   .99)
+
+    DQ_i   <- 1 / (1 - dPQ_c)              # length N
+    DW     <- 1 / (1 - dPW_c)              # scalar
+
+    # --- Grand mean of x (= PW x) -----------------------------------------
+    mean_x <- sum(x) / N                   # scalar
+
+    # --- (Gs x) in O(N), then contract with e -----------------------------
+    # Gs x = DQ * (PQ x - diag(PQ) * x) - DW * (PW x - diag(PW) * x)
+    Gs_x   <- DQ_i * (PQx_i - dPQ_i * x) - DW * (mean_x - dPW * x)
+
+    total  <- total + sum(ev * Gs_x)
+
+    if (noisy) {
+      cat(iteration, "of", length(uniqW), "done. ")
+      iteration <- iteration + 1L
+    }
+  }
+
+  total
 }

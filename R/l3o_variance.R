@@ -180,46 +180,46 @@ L3Ovar_iloop_cov <- function(X, e, P, G, noisy = FALSE) {
 #'
 #' @export
 L3Ovar_gloop_cov <- function(df, group, groupW, X, e, MX, Me) {
-  df$group <- eval(substitute(group), df)
+  df$group <- eval(substitute(group), df) # Find column named group in dataframe df, then create new column in the dataframe with the same name
   df$groupW <- eval(substitute(groupW), df)
   df$X <- eval(substitute(X), df)
   df$e <- eval(substitute(e), df)
   df$MX <- eval(substitute(MX), df)
   df$Me <- eval(substitute(Me), df)
 
-  A11vecs <- A12vecs <- A13vecs <- A14vecs <- A15vecs <- rep(0, max(unique(df$group)))
+  A11vecs <- A12vecs <- A13vecs <- A14vecs <- A15vecs <- rep(0, max(unique(df$group))) # Create empty/zero vectors
   A21vecs <- A22vecs <- A23vecs <- A24vecs <- A25vecs <- rep(0, max(unique(df$group)))
   A31vecs <- A32vecs <- A33vecs <- A34vecs <- A35vecs <- rep(0, max(unique(df$group)))
   A41vecs <- A42vecs <- A43vecs <- A44vecs <- rep(0, max(unique(df$group)))
   A51vecs <- A52vecs <- A53vecs <- A54vecs <- rep(0, max(unique(df$group)))
-  for (s in unique(df$groupW)) {
-    ds <- df[df$groupW == s, ]
-    ZQ <- matrix(0, nrow = length(ds$group), ncol = length(unique(ds$group)))
-    ds$groupidx <- Getgroupindex(ds, group)
-    ZQ[cbind(seq_along(ds$groupidx), ds$groupidx)] <- 1
-    ZW <- matrix(1, nrow = length(ds$groupW), ncol = length(unique(ds$groupW)))
+  for (s in unique(df$groupW)) { # Start to loop through every groupW
+    ds <- df[df$groupW == s, ] # Temporary dataset for each s
+    ZQ <- matrix(0, nrow = length(ds$group), ncol = length(unique(ds$group))) # Create empty matrix, col = number instrument groups, row = number of obs
+    ds$groupidx <- Getgroupindex(ds, group) # Numbering group
+    ZQ[cbind(seq_along(ds$groupidx), ds$groupidx)] <- 1 # Add 1 values in matrix ZQ where i=j
+    ZW <- matrix(1, nrow = length(ds$groupW), ncol = length(unique(ds$groupW))) # Create matrix of ones, col = 1 (unique in ds$groupW), row=numberofgroupW
 
-    PQ <- ZQ %*% solve(t(ZQ) %*% ZQ) %*% t(ZQ)
+    PQ <- ZQ %*% solve(t(ZQ) %*% ZQ) %*% t(ZQ) # Projection matrix P = X (X'X)^-1 X'
     PW <- ZW %*% solve(t(ZW) %*% ZW) %*% t(ZW)
 
     # calculate values specific to this subset
-    Gs <- solve(diag(nrow(ds)) - diag(diag(PQ))) %*% (PQ - diag(diag(PQ))) -
+    Gs <- solve(diag(nrow(ds)) - diag(diag(PQ))) %*% (PQ - diag(diag(PQ))) - # L1O adjustment: Remove diagonal, rescale weights, subtract groupW variation
       solve(diag(nrow(ds)) - diag(diag(PW))) %*% (PW - diag(diag(PW)))
     Ps <- PQ
-    Ms <- diag(nrow(ds)) - Ps
-    dMs <- matrix(diag(Ms), ncol = 1)
-    D2s <- dMs %*% t(dMs) - Ms * Ms
-    recD2s <- 1 / D2s
+    Ms <- diag(nrow(ds)) - Ps # Residuals M = I - P
+    dMs <- matrix(diag(Ms), ncol = 1) # Extract diagonal of M
+    D2s <- dMs %*% t(dMs) - Ms * Ms # D_ij
+    recD2s <- 1 / D2s # Invert for weights, then remove diagonal
     diag(recD2s) <- 0
 
-    for (g in unique(ds$group)) {
+    for (g in unique(ds$group)) { # Start loop of single instrument group
       repidx <- min(which(ds$group == g)) # representative index
-      Pis <- matrix(Ps[, repidx], ncol = 1)
-      Pgs <- ifelse(Pis == 0, 0, 1) %*% matrix(1, ncol = length(Pis), nrow = 1)
-      Gis <- matrix(Gs[, repidx], ncol = 1)
+      Pis <- matrix(Ps[, repidx], ncol = 1) # Extract projection weights
+      Pgs <- ifelse(Pis == 0, 0, 1) %*% matrix(1, ncol = length(Pis), nrow = 1) # identify which observations are linked to this group
+      Gis <- matrix(Gs[, repidx], ncol = 1) # L1O weights
       Gis[repidx, 1] <- Gis[repidx + 1, 1] # Put the G back
-      Mis <- matrix(-Ps[, repidx], ncol = 1)
-      recD2is <- matrix(recD2s[, repidx], ncol = 1)
+      Mis <- matrix(-Ps[, repidx], ncol = 1) # Annihilator
+      recD2is <- matrix(recD2s[, repidx], ncol = 1) # variance correction
       recD2is[repidx, 1] <- recD2is[repidx + 1, 1] # Put the G back
       D3is <- Ms[repidx, repidx] * D2s - (dMs %*% t(Mis)^2 + Mis^2 %*% t(dMs) - 2 * Ms * (Mis %*% t(Mis)))
       D2D3is <- D2s / D3is

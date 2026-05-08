@@ -38,22 +38,29 @@
 #'
 #' @noRd
 A1type_sum <- function(df, group, groupW, ipos, jpos, kpos, lpos, noisy = FALSE) {
+
+  # 0. Setup with zero vectors
   A11vecs <- A12vecs <- A13vecs <- A14vecs <- A15vecs <- rep(0, max(df$group))
 
+  # 1. Evaluate inputs from dataframe
   df$ipos <- eval(substitute(ipos), df)
   df$jpos <- eval(substitute(jpos), df)
   df$kpos <- eval(substitute(kpos), df)
   df$lpos <- eval(substitute(lpos), df)
 
+  # 2. Looping through groupW
   iteration <- 1
   for (s in unique(df$groupW)) {
     ds <- df[df$groupW == s, ]
 
+  # 2.1. Identify stratum groups within groupW and remove ones with < 3 obs
     ds$numingrp <- 0
     for (j in unique(ds$group)) {
       ds$numingrp[ds$group == j] <- sum(ds$group == j)
     }
     ds <- ds[ds$numingrp >= 3, ]
+
+    # 3. Compute matrix P_Q for each stratum
     if (nrow(ds) == 0) {
       for (g in unique(ds$group)) {
         A11vecs[g] <- A12vecs[g] <- A13vecs[g] <- A14vecs[g] <- A15vecs[g] <- 0
@@ -80,6 +87,7 @@ A1type_sum <- function(df, group, groupW, ipos, jpos, kpos, lpos, noisy = FALSE)
       recD2s <- 1 / D2s
       diag(recD2s) <- 0
 
+      # 4. Iterate through each group within stratum, find its contribution
       for (g in unique(ds$group)) {
         if (nrow(ds[ds$group == g, ]) <= 3) {
           A11vecs[g] <- A12vecs[g] <- A13vecs[g] <- A14vecs[g] <- A15vecs[g] <- 0
