@@ -1,11 +1,12 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# mwivhet
+# mwivhet: Inference with Many Weak Instruments and Heterogeneity
 
 <!-- badges: start -->
 
 [![R-CMD-check](https://github.com/minhnngo/mwivhet/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/minhnngo/mwivhet/actions/workflows/R-CMD-check.yaml)
+
 <!-- badges: end -->
 
 Inference in a linear instrumental variable regression model with many
@@ -26,4 +27,95 @@ if (!requireNamespace("remotes")) {
   install.packages("remotes")
 }
 remotes::install_github("minhnngo/mwivhet")
+```
+
+## Simulation Demo
+
+### Judge Example without Covariates
+
+``` r
+library(mwivhet)
+# Demo for judge example without covariates
+
+# Numerator
+LMnum <- GetLM_nocov(df = dnc, X = X, e = e, groupZ = group)
+
+# L3O Variance
+LMVar <- L3Ovar_gloop_nocov(df = dnc, group = group, X = X, e = e, MX = MX, Me = Me)
+
+# t-statistic for LM test (compare with std normal)
+LMt <- LMnum / sqrt(LMVar)
+
+# Confidence Intervals
+# Get coefficients first, then values
+CI_coefs <- GetCIcoef_nocov(df = dnc, groupZ = group, X = X, Y = Y, MX = MX, MY = MY)
+CI <- GetCIvals(CI_coefs)
+
+print(paste("LM Statistic:", LMt))
+#> [1] "LM Statistic: -0.790957868876291"
+print("Confidence Interval:")
+#> [1] "Confidence Interval:"
+print(CI)
+#> [1] -1.9568467  0.4052406
+```
+
+### Quarter-of-Birth Example with Covariates (1)
+
+``` r
+# Demo for QOB example with covariates
+
+# Numerator
+# group indexes every QOB and groupW combination
+LMnum <- GetLM(df = dc, X = X, e = e, groupW = groupW, group = group)
+
+# Variance
+LMVar <- L3Ovar_gloop_cov(df = dc, group = group, groupW = groupW, X = X, e = e, 
+                          MX = MX, Me = Me)
+
+# t-statistic for LM test
+LMt <- LMnum / sqrt(LMVar)
+
+# Confidence Intervals (Fast method)
+CI_coefs <- GetL3OCIcoef_fast(df = dc, groupW = groupW, group = group, X = X, 
+                              Y = Y, MX = MX, MY = MY)
+CI <- GetCIvals(CI_coefs)
+
+print(paste("LM Statistic:", LMt))
+#> [1] "LM Statistic: 0.503840615057238"
+print("Confidence Interval:")
+#> [1] "Confidence Interval:"
+print(CI)
+#> [1] -0.5115206  0.6889379
+```
+
+### Quarter-of-Birth Example with Covariates (2)
+
+``` r
+# Demo for QOB example with covariates, using stored G and P. Slower but allows continuous W, Z
+# Would give the same results as previous example
+
+# Construct G and P using the package function
+GP <- GetGP(group = dc$group, groupW = dc$groupW, n = nrow(dc))
+
+# Numerator
+# Note: as.numeric ensures it returns a scalar, not a 1x1 matrix
+LMnum <- as.numeric(t(dc$e) %*% GP$G %*% dc$X)
+
+# L3O Variance
+LMVar <- L3Ovar_iloop_cov(X = dc$X, e = dc$e, P = GP$P, G = GP$G)
+
+# t-statistic
+LMt <- LMnum / sqrt(LMVar)
+
+# Confidence Intervals
+CI_coefs <- GetCIcoef_iloop(df = dc, P = GP$P, G = GP$G, X = X, Y = Y, MX = MX, 
+                            MY = MY, Z = GP$Z, W = GP$W, noisy = FALSE)
+CI <- GetCIvals(CI_coefs)
+
+print(paste("LM Statistic:", LMt))
+#> [1] "LM Statistic: 0.503840615057238"
+print("Confidence Interval:")
+#> [1] "Confidence Interval:"
+print(CI)
+#> [1] -0.5115206  0.6889379
 ```

@@ -66,10 +66,11 @@
       </header><div class="row">
   <div class="contents col-md-9">
 <div class="section level1">
-<div class="page-header"><h1 id="mwivhet">mwivhet<a class="anchor" aria-label="anchor" href="#mwivhet"></a>
+<div class="page-header"><h1 id="mwivhet-inference-with-many-weak-instruments-and-heterogeneity">mwivhet: Inference with Many Weak Instruments and Heterogeneity<a class="anchor" aria-label="anchor" href="#mwivhet-inference-with-many-weak-instruments-and-heterogeneity"></a>
 </h1></div>
 <!-- badges: start -->
 
+<!-- badges: end -->
 <p>Inference in a linear instrumental variable regression model with many potentially weak instruments, in the presence of heterogeneous treatment effects. The package implements procedures from <a href="https://www.arxiv.org/abs/2408.11193" class="external-link">Yap (2025)</a>.</p>
 <p>Please refer to the <a href="https://minhnngo.github.io/mwivhet" class="external-link">website</a> for comprehensive details and a demonstration of the package functions.</p>
 <div class="section level2">
@@ -81,6 +82,99 @@
 <span>  <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"remotes"</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span><span class="fu">remotes</span><span class="fu">::</span><span class="fu"><a href="https://remotes.r-lib.org/reference/install_github.html" class="external-link">install_github</a></span><span class="op">(</span><span class="st">"minhnngo/mwivhet"</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="simulation-demo">Simulation Demo<a class="anchor" aria-label="anchor" href="#simulation-demo"></a>
+</h2>
+<div class="section level3">
+<h3 id="judge-example-without-covariates">Judge Example without Covariates<a class="anchor" aria-label="anchor" href="#judge-example-without-covariates"></a>
+</h3>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/minhnngo/mwivhet" class="external-link">mwivhet</a></span><span class="op">)</span></span>
+<span><span class="co"># Demo for judge example without covariates</span></span>
+<span></span>
+<span><span class="co"># Numerator</span></span>
+<span><span class="va">LMnum</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/GetLM_nocov.html">GetLM_nocov</a></span><span class="op">(</span>df <span class="op">=</span> <span class="va">dnc</span>, X <span class="op">=</span> <span class="va">X</span>, e <span class="op">=</span> <span class="va">e</span>, groupZ <span class="op">=</span> <span class="va">group</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># L3O Variance</span></span>
+<span><span class="va">LMVar</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/L3Ovar_gloop_nocov.html">L3Ovar_gloop_nocov</a></span><span class="op">(</span>df <span class="op">=</span> <span class="va">dnc</span>, group <span class="op">=</span> <span class="va">group</span>, X <span class="op">=</span> <span class="va">X</span>, e <span class="op">=</span> <span class="va">e</span>, MX <span class="op">=</span> <span class="va">MX</span>, Me <span class="op">=</span> <span class="va">Me</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># t-statistic for LM test (compare with std normal)</span></span>
+<span><span class="va">LMt</span> <span class="op">&lt;-</span> <span class="va">LMnum</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="va">LMVar</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Confidence Intervals</span></span>
+<span><span class="co"># Get coefficients first, then values</span></span>
+<span><span class="va">CI_coefs</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/GetCIcoef_nocov.html">GetCIcoef_nocov</a></span><span class="op">(</span>df <span class="op">=</span> <span class="va">dnc</span>, groupZ <span class="op">=</span> <span class="va">group</span>, X <span class="op">=</span> <span class="va">X</span>, Y <span class="op">=</span> <span class="va">Y</span>, MX <span class="op">=</span> <span class="va">MX</span>, MY <span class="op">=</span> <span class="va">MY</span><span class="op">)</span></span>
+<span><span class="va">CI</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/GetCIvals.html">GetCIvals</a></span><span class="op">(</span><span class="va">CI_coefs</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"LM Statistic:"</span>, <span class="va">LMt</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "LM Statistic: -0.790957868876291"</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="st">"Confidence Interval:"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "Confidence Interval:"</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">CI</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] -1.9568467  0.4052406</span></span></code></pre></div>
+</div>
+<div class="section level3">
+<h3 id="quarter-of-birth-example-with-covariates-1">Quarter-of-Birth Example with Covariates (1)<a class="anchor" aria-label="anchor" href="#quarter-of-birth-example-with-covariates-1"></a>
+</h3>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Demo for QOB example with covariates</span></span>
+<span></span>
+<span><span class="co"># Numerator</span></span>
+<span><span class="co"># group indexes every QOB and groupW combination</span></span>
+<span><span class="va">LMnum</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/GetLM.html">GetLM</a></span><span class="op">(</span>df <span class="op">=</span> <span class="va">dc</span>, X <span class="op">=</span> <span class="va">X</span>, e <span class="op">=</span> <span class="va">e</span>, groupW <span class="op">=</span> <span class="va">groupW</span>, group <span class="op">=</span> <span class="va">group</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Variance</span></span>
+<span><span class="va">LMVar</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/L3Ovar_gloop_cov.html">L3Ovar_gloop_cov</a></span><span class="op">(</span>df <span class="op">=</span> <span class="va">dc</span>, group <span class="op">=</span> <span class="va">group</span>, groupW <span class="op">=</span> <span class="va">groupW</span>, X <span class="op">=</span> <span class="va">X</span>, e <span class="op">=</span> <span class="va">e</span>, </span>
+<span>                          MX <span class="op">=</span> <span class="va">MX</span>, Me <span class="op">=</span> <span class="va">Me</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># t-statistic for LM test</span></span>
+<span><span class="va">LMt</span> <span class="op">&lt;-</span> <span class="va">LMnum</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="va">LMVar</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Confidence Intervals (Fast method)</span></span>
+<span><span class="va">CI_coefs</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/GetL3OCIcoef_fast.html">GetL3OCIcoef_fast</a></span><span class="op">(</span>df <span class="op">=</span> <span class="va">dc</span>, groupW <span class="op">=</span> <span class="va">groupW</span>, group <span class="op">=</span> <span class="va">group</span>, X <span class="op">=</span> <span class="va">X</span>, </span>
+<span>                              Y <span class="op">=</span> <span class="va">Y</span>, MX <span class="op">=</span> <span class="va">MX</span>, MY <span class="op">=</span> <span class="va">MY</span><span class="op">)</span></span>
+<span><span class="va">CI</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/GetCIvals.html">GetCIvals</a></span><span class="op">(</span><span class="va">CI_coefs</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"LM Statistic:"</span>, <span class="va">LMt</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "LM Statistic: 0.503840615057238"</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="st">"Confidence Interval:"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "Confidence Interval:"</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">CI</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] -0.5115206  0.6889379</span></span></code></pre></div>
+</div>
+<div class="section level3">
+<h3 id="quarter-of-birth-example-with-covariates-2">Quarter-of-Birth Example with Covariates (2)<a class="anchor" aria-label="anchor" href="#quarter-of-birth-example-with-covariates-2"></a>
+</h3>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Demo for QOB example with covariates, using stored G and P. Slower but allows continuous W, Z</span></span>
+<span><span class="co"># Would give the same results as previous example</span></span>
+<span></span>
+<span><span class="co"># Construct G and P using the package function</span></span>
+<span><span class="va">GP</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/GetGP.html">GetGP</a></span><span class="op">(</span>group <span class="op">=</span> <span class="va">dc</span><span class="op">$</span><span class="va">group</span>, groupW <span class="op">=</span> <span class="va">dc</span><span class="op">$</span><span class="va">groupW</span>, n <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">dc</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Numerator</span></span>
+<span><span class="co"># Note: as.numeric ensures it returns a scalar, not a 1x1 matrix</span></span>
+<span><span class="va">LMnum</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/t.html" class="external-link">t</a></span><span class="op">(</span><span class="va">dc</span><span class="op">$</span><span class="va">e</span><span class="op">)</span> <span class="op"><a href="https://rdrr.io/r/base/matmult.html" class="external-link">%*%</a></span> <span class="va">GP</span><span class="op">$</span><span class="va">G</span> <span class="op"><a href="https://rdrr.io/r/base/matmult.html" class="external-link">%*%</a></span> <span class="va">dc</span><span class="op">$</span><span class="va">X</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># L3O Variance</span></span>
+<span><span class="va">LMVar</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/L3Ovar_iloop_cov.html">L3Ovar_iloop_cov</a></span><span class="op">(</span>X <span class="op">=</span> <span class="va">dc</span><span class="op">$</span><span class="va">X</span>, e <span class="op">=</span> <span class="va">dc</span><span class="op">$</span><span class="va">e</span>, P <span class="op">=</span> <span class="va">GP</span><span class="op">$</span><span class="va">P</span>, G <span class="op">=</span> <span class="va">GP</span><span class="op">$</span><span class="va">G</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># t-statistic</span></span>
+<span><span class="va">LMt</span> <span class="op">&lt;-</span> <span class="va">LMnum</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="va">LMVar</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Confidence Intervals</span></span>
+<span><span class="va">CI_coefs</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/GetCIcoef_iloop.html">GetCIcoef_iloop</a></span><span class="op">(</span>df <span class="op">=</span> <span class="va">dc</span>, P <span class="op">=</span> <span class="va">GP</span><span class="op">$</span><span class="va">P</span>, G <span class="op">=</span> <span class="va">GP</span><span class="op">$</span><span class="va">G</span>, X <span class="op">=</span> <span class="va">X</span>, Y <span class="op">=</span> <span class="va">Y</span>, MX <span class="op">=</span> <span class="va">MX</span>, </span>
+<span>                            MY <span class="op">=</span> <span class="va">MY</span>, Z <span class="op">=</span> <span class="va">GP</span><span class="op">$</span><span class="va">Z</span>, W <span class="op">=</span> <span class="va">GP</span><span class="op">$</span><span class="va">W</span>, noisy <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="va">CI</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/GetCIvals.html">GetCIvals</a></span><span class="op">(</span><span class="va">CI_coefs</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"LM Statistic:"</span>, <span class="va">LMt</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "LM Statistic: 0.503840615057238"</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="st">"Confidence Interval:"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "Confidence Interval:"</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">CI</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] -0.5115206  0.6889379</span></span></code></pre></div>
+</div>
 </div>
 </div>
   </div>
