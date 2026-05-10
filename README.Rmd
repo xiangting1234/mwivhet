@@ -36,6 +36,9 @@ if (!requireNamespace("remotes")) {
 remotes::install_github("minhnngo/mwivhet")
 ```
 
+## Citation
+If you use mwivhet, please cite: https://doi.org/10.48550/arXiv.2408.11193  
+
 ## Simulation Demo
 
 ### Judge Example without Covariates
