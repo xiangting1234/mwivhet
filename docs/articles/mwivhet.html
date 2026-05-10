@@ -78,17 +78,7 @@
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/minhnngo/mwivhet" class="external-link">mwivhet</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://dplyr.tidyverse.org" class="external-link">dplyr</a></span><span class="op">)</span></span>
-<span><span class="co">#&gt; Warning: package 'dplyr' was built under R version 4.3.3</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Attaching package: 'dplyr'</span></span>
-<span><span class="co">#&gt; The following objects are masked from 'package:stats':</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt;     filter, lag</span></span>
-<span><span class="co">#&gt; The following objects are masked from 'package:base':</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt;     intersect, setdiff, setequal, union</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://lrberge.github.io/fixest/" class="external-link">fixest</a></span><span class="op">)</span></span>
-<span><span class="co">#&gt; Warning: package 'fixest' was built under R version 4.3.3</span></span></code></pre></div>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://lrberge.github.io/fixest/" class="external-link">fixest</a></span><span class="op">)</span></span></code></pre></div>
 <p>The following code shows the application of the method in
 investigating the effect of misdemeanor prosecution (X) on criminal
 complaint in two years (Y), based on the paper Misdemeanor Prosecution
@@ -96,9 +86,9 @@ complaint in two years (Y), based on the paper Misdemeanor Prosecution
 2023)</a>.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># 0. Setup ----------------------------------------------------------------</span></span>
-<span><span class="va">df</span> <span class="op">&lt;-</span> <span class="va">suffolk</span></span></code></pre></div>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># 1. Preparation ----------------------------------------------------------</span></span>
+<span><span class="va">df</span> <span class="op">&lt;-</span> <span class="va">suffolk</span></span>
+<span></span>
+<span><span class="co"># 1. Preparation ----------------------------------------------------------</span></span>
 <span><span class="co"># 1.1. Variable Assignment</span></span>
 <span><span class="va">df</span> <span class="op">&lt;-</span> <span class="va">df</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span></span>
@@ -134,18 +124,21 @@ complaint in two years (Y), based on the paper Misdemeanor Prosecution
 <span><span class="va">df</span><span class="op">$</span><span class="va">MX</span> <span class="op">&lt;-</span> <span class="va">lmX</span><span class="op">$</span><span class="va">residuals</span></span>
 <span></span>
 <span><span class="va">lmY</span> <span class="op">&lt;-</span> <span class="fu">fixest</span><span class="fu">::</span><span class="fu"><a href="https://lrberge.github.io/fixest/reference/feols.html" class="external-link">feols</a></span><span class="op">(</span><span class="va">Y</span><span class="op">~</span><span class="fl">1</span><span class="op">|</span><span class="va">group</span>,data<span class="op">=</span><span class="va">df</span><span class="op">)</span></span>
-<span><span class="va">df</span><span class="op">$</span><span class="va">MY</span> <span class="op">&lt;-</span> <span class="va">lmY</span><span class="op">$</span><span class="va">residuals</span></span></code></pre></div>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># 2. Inference ------------------------------------------------------------</span></span>
+<span><span class="va">df</span><span class="op">$</span><span class="va">MY</span> <span class="op">&lt;-</span> <span class="va">lmY</span><span class="op">$</span><span class="va">residuals</span></span>
+<span></span>
+<span><span class="co"># 2. Inference ------------------------------------------------------------</span></span>
 <span><span class="co"># L3O CI</span></span>
 <span><span class="va">S_hat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/GetLM.html">GetLM</a></span><span class="op">(</span><span class="va">df</span>, <span class="va">X</span>, <span class="va">X</span>, <span class="va">groupW</span>, <span class="va">group</span>, noisy <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="va">JIVE</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/GetLM.html">GetLM</a></span><span class="op">(</span><span class="va">df</span>, <span class="va">X</span>, <span class="va">Y</span>, <span class="va">groupW</span>, <span class="va">group</span>, noisy <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">/</span><span class="va">S_hat</span>; <span class="va">JIVE</span> <span class="co">#-0.144</span></span>
+<span><span class="va">JIVE</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/GetLM.html">GetLM</a></span><span class="op">(</span><span class="va">df</span>, <span class="va">X</span>, <span class="va">Y</span>, <span class="va">groupW</span>, <span class="va">group</span>, noisy <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">/</span><span class="va">S_hat</span> </span>
+<span><span class="va">JIVE</span> <span class="co">#-0.144</span></span>
 <span><span class="co">#&gt; [1] -0.1440279</span></span>
 <span></span>
 <span><span class="va">L3OCIcoef</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/GetCIcoef.html">GetCIcoef</a></span><span class="op">(</span><span class="va">df</span>, <span class="va">groupW</span>, <span class="va">group</span>, <span class="va">X</span>, <span class="va">Y</span>, <span class="va">MX</span>, <span class="va">MY</span>, noisy <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="va">L3OCI</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/GetCItypebd.html">GetCItypebd</a></span><span class="op">(</span><span class="va">L3OCIcoef</span><span class="op">)</span><span class="op">[</span><span class="fl">2</span><span class="op">:</span><span class="fl">3</span><span class="op">]</span> <span class="co"># [-0.222, -0.066]</span></span></code></pre></div>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># 3. Table ----------------------------------------------------------------</span></span>
+<span><span class="va">L3OCI</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/GetCItypebd.html">GetCItypebd</a></span><span class="op">(</span><span class="va">L3OCIcoef</span><span class="op">)</span><span class="op">[</span><span class="fl">2</span><span class="op">:</span><span class="fl">3</span><span class="op">]</span> <span class="co"># [-0.222, -0.066]</span></span>
+<span><span class="va">L3OCI</span></span>
+<span><span class="co">#&gt; [1] -0.22183974 -0.06643859</span></span>
+<span></span>
+<span><span class="co"># 3. Table ----------------------------------------------------------------</span></span>
 <span><span class="co"># 3.1. Create the matrix using calculated L3O variables</span></span>
 <span><span class="va">L3O_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
 <span>  <span class="va">L3OCI</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span>,                <span class="co"># Lower Bound</span></span>
@@ -158,7 +151,7 @@ complaint in two years (Y), based on the paper Misdemeanor Prosecution
 <span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">L3O_data</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"LB"</span>, <span class="st">"UB"</span>, <span class="st">"Estimate"</span>, <span class="st">"CIlength"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">L3O_data</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="st">"L3O"</span></span>
 <span></span>
-<span><span class="co"># 3. Round and save</span></span>
+<span><span class="co"># 3.3 Round and save</span></span>
 <span><span class="va">CItab_L3O_round</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">L3O_data</span>, <span class="fl">3</span><span class="op">)</span></span>
 <span><span class="va">CItab_L3O_round</span></span>
 <span><span class="co">#&gt;             L3O</span></span>

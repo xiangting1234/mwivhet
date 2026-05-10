@@ -10,7 +10,9 @@ vignette: >
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>"
+  comment = "#>",
+  message = FALSE, 
+  warning = FALSE
 )
 ```
 
@@ -26,9 +28,7 @@ The following code shows the application of the method in investigating the effe
 ```{r}
 # 0. Setup ----------------------------------------------------------------
 df <- suffolk
-```
 
-```{r}
 # 1. Preparation ----------------------------------------------------------
 # 1.1. Variable Assignment
 df <- df %>%
@@ -66,20 +66,17 @@ df$MX <- lmX$residuals
 
 lmY <- fixest::feols(Y~1|group,data=df)
 df$MY <- lmY$residuals
-```
 
-```{r}
 # 2. Inference ------------------------------------------------------------
 # L3O CI
 S_hat <- GetLM(df, X, X, groupW, group, noisy = FALSE)
-JIVE <- GetLM(df, X, Y, groupW, group, noisy = FALSE)/S_hat; JIVE #-0.144
+JIVE <- GetLM(df, X, Y, groupW, group, noisy = FALSE)/S_hat 
+JIVE #-0.144
 
 L3OCIcoef <- GetCIcoef(df, groupW, group, X, Y, MX, MY, noisy = FALSE)
 L3OCI <- GetCItypebd(L3OCIcoef)[2:3] # [-0.222, -0.066]
-```
+L3OCI
 
-
-```{r}
 # 3. Table ----------------------------------------------------------------
 # 3.1. Create the matrix using calculated L3O variables
 L3O_data <- matrix(c(
@@ -93,7 +90,7 @@ L3O_data <- matrix(c(
 rownames(L3O_data) <- c("LB", "UB", "Estimate", "CIlength")
 colnames(L3O_data) <- "L3O"
 
-# 3. Round and save
+# 3.3 Round and save
 CItab_L3O_round <- round(L3O_data, 3)
 CItab_L3O_round
 ```
