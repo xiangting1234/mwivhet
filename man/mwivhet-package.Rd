@@ -21,6 +21,7 @@ Useful links:
 
 Authors:
 \itemize{
+  \item Ngoc Minh Ngo \email{minh.ngongoc2@gmail.com} (Package implementation and documentation)
   \item Luther Yap \email{lyap@nus.edu.sg} (Original method and code implementation)
 }
 

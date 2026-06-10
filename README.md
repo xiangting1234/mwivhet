@@ -14,8 +14,9 @@ potentially weak instruments, in the presence of heterogeneous treatment
 effects. The package implements procedures from [Yap
 (2025)](https://www.arxiv.org/abs/2408.11193).
 
-Please refer to the [website](https://minhnngo.github.io/mwivhet) for
-comprehensive details and a demonstration of the package functions.
+The example below uses the bundled Suffolk County prosecution data. For
+additional documentation, please refer to the [package
+website](https://minhnngo.github.io/mwivhet).
 
 ## Installation
 
@@ -34,93 +35,82 @@ remotes::install_github("minhnngo/mwivhet")
 If you use mwivhet, please cite:
 <https://doi.org/10.48550/arXiv.2408.11193>
 
-## Simulation Demo
+## Suffolk County Application
 
-### Judge Example without Covariates
+### The following code shows the application of the method in investigating the effect of misdemeanor prosecution (X) on criminal complaint in two years (Y), based on the paper Misdemeanor Prosecution [(Agan et al., 2023)](https://doi.org/10.1093/qje/qjad005).
 
 ``` r
 library(mwivhet)
-# Demo for judge example without covariates
+library(dplyr)
+library(fixest)
 
-# Numerator
-LMnum <- GetLM_nocov(df = dnc, X = X, e = e, groupZ = group)
+# 0. Setup ----------------------------------------------------------------
+df <- suffolk
 
-# L3O Variance
-LMVar <- L3Ovar_gloop_nocov(df = dnc, group = group, X = X, e = e, MX = MX, Me = Me)
+# 1. Preparation ----------------------------------------------------------
+# 1.1. Variable Assignment
+df <- df %>%
+  mutate(
+    X = ng_immed_all,
+    Y = anyr_twoyears_arrest2,
+    groupZ = first_pros
+  )
 
-# t-statistic for LM test (compare with std normal)
-LMt <- LMnum / sqrt(LMVar)
+# 1.2. Construct Covariate Groups (groupW)
+df <- df %>%
+  mutate(
+    monthID = as.integer(factor(court_month2)),
+    dowID   = as.integer(factor(court_dow2)),
+    groupW  = as.integer(factor(paste(dowID, monthID, sep = "_")))
+  )
 
-# Confidence Intervals
-# Get coefficients first, then values
-CI_coefs <- GetCIcoef_nocov(df = dnc, groupZ = group, X = X, Y = Y, MX = MX, MY = MY)
-CI <- GetCIvals(CI_coefs)
+# 1.3. Construct Interaction Groups (groupQ / group)
+df <- df %>%
+  mutate(
+    groupQ = as.integer(factor(paste(groupW, groupZ, sep = "_"))),
+    group  = groupQ
+  )
 
-print(paste("LM Statistic:", LMt))
-#> [1] "LM Statistic: -0.790957868876291"
-print("Confidence Interval:")
-#> [1] "Confidence Interval:"
-print(CI)
-#> [1] -1.9568467  0.4052406
-```
+# 1.4. Filter for Group Size
+df <- df %>%
+  group_by(groupQ) %>%
+  filter(n() >= 4) %>%
+  ungroup()
 
-### Quarter-of-Birth Example with Covariates (1)
 
-``` r
-# Demo for QOB example with covariates
+# 1.5. Get residualized objects
+lmX <- fixest::feols(X~1|group,data=df)
+df$MX <- lmX$residuals
 
-# Numerator
-# group indexes every QOB and groupW combination
-LMnum <- GetLM(df = dc, X = X, e = e, groupW = groupW, group = group)
+lmY <- fixest::feols(Y~1|group,data=df)
+df$MY <- lmY$residuals
 
-# Variance
-LMVar <- L3Ovar_gloop_cov(df = dc, group = group, groupW = groupW, X = X, e = e, 
-                          MX = MX, Me = Me)
+# 2. Inference ------------------------------------------------------------
+S_hat <- GetLM(df, X, X, groupW, group, noisy = FALSE)
+JIVE <- GetLM(df, X, Y, groupW, group, noisy = FALSE)/S_hat 
 
-# t-statistic for LM test
-LMt <- LMnum / sqrt(LMVar)
+L3OCIcoef <- GetCIcoef(df, groupW, group, X, Y, MX, MY, noisy = FALSE)
+L3OCI <- GetCItypebd(L3OCIcoef)[2:3] 
 
-# Confidence Intervals (Fast method)
-CI_coefs <- GetL3OCIcoef_fast(df = dc, groupW = groupW, group = group, X = X, 
-                              Y = Y, MX = MX, MY = MY)
-CI <- GetCIvals(CI_coefs)
+# 3. Table ----------------------------------------------------------------
+# 3.1. Create the matrix using calculated L3O variables
+L3O_data <- matrix(c(
+  L3OCI[1],                # Lower Bound
+  L3OCI[2],                # Upper Bound
+  JIVE,                    # Point Estimate
+  L3OCI[2] - L3OCI[1]      # CI Length
+), ncol = 1)
 
-print(paste("LM Statistic:", LMt))
-#> [1] "LM Statistic: 0.503840615057238"
-print("Confidence Interval:")
-#> [1] "Confidence Interval:"
-print(CI)
-#> [1] -0.5115206  0.6889379
-```
+# 3.2. Add labels for row/col
+rownames(L3O_data) <- c("LB", "UB", "Estimate", "CIlength")
+colnames(L3O_data) <- "L3O"
 
-### Quarter-of-Birth Example with Covariates (2)
-
-``` r
-# Demo for QOB example with covariates, using stored G and P. Slower but allows continuous W, Z
-# Would give the same results as previous example
-
-# Construct G and P using the package function
-GP <- GetGP(group = dc$group, groupW = dc$groupW, n = nrow(dc))
-
-# Numerator
-# Note: as.numeric ensures it returns a scalar, not a 1x1 matrix
-LMnum <- as.numeric(t(dc$e) %*% GP$G %*% dc$X)
-
-# L3O Variance
-LMVar <- L3Ovar_iloop_cov(X = dc$X, e = dc$e, P = GP$P, G = GP$G)
-
-# t-statistic
-LMt <- LMnum / sqrt(LMVar)
-
-# Confidence Intervals
-CI_coefs <- GetCIcoef_iloop(df = dc, P = GP$P, G = GP$G, X = X, Y = Y, MX = MX, 
-                            MY = MY, Z = GP$Z, W = GP$W, noisy = FALSE)
-CI <- GetCIvals(CI_coefs)
-
-print(paste("LM Statistic:", LMt))
-#> [1] "LM Statistic: 0.503840615057238"
-print("Confidence Interval:")
-#> [1] "Confidence Interval:"
-print(CI)
-#> [1] -0.5115206  0.6889379
+# 3.3 Round and save
+CItab_L3O_round <- round(L3O_data, 3)
+CItab_L3O_round
+#>             L3O
+#> LB       -0.222
+#> UB       -0.066
+#> Estimate -0.144
+#> CIlength  0.155
 ```

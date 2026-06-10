@@ -72,7 +72,7 @@
 
 <!-- badges: end -->
 <p>Inference in a linear instrumental variable regression model with many potentially weak instruments, in the presence of heterogeneous treatment effects. The package implements procedures from <a href="https://www.arxiv.org/abs/2408.11193" class="external-link">Yap (2025)</a>.</p>
-<p>Please refer to the <a href="https://minhnngo.github.io/mwivhet" class="external-link">website</a> for comprehensive details and a demonstration of the package functions.</p>
+<p>The example below uses the bundled Suffolk County prosecution data. For additional documentation, please refer to the <a href="https://minhnngo.github.io/mwivhet" class="external-link">package website</a>.</p>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
@@ -89,96 +89,85 @@
 <p>If you use mwivhet, please cite: <a href="https://doi.org/10.48550/arXiv.2408.11193" class="external-link uri">https://doi.org/10.48550/arXiv.2408.11193</a></p>
 </div>
 <div class="section level2">
-<h2 id="simulation-demo">Simulation Demo<a class="anchor" aria-label="anchor" href="#simulation-demo"></a>
+<h2 id="suffolk-county-application">Suffolk County Application<a class="anchor" aria-label="anchor" href="#suffolk-county-application"></a>
 </h2>
 <div class="section level3">
-<h3 id="judge-example-without-covariates">Judge Example without Covariates<a class="anchor" aria-label="anchor" href="#judge-example-without-covariates"></a>
+<h3 id="the-following-code-shows-the-application-of-the-method-in-investigating-the-effect-of-misdemeanor-prosecution-x-on-criminal-complaint-in-two-years-y-based-on-the-paper-misdemeanor-prosecution-agan-et-al-2023">The following code shows the application of the method in investigating the effect of misdemeanor prosecution (X) on criminal complaint in two years (Y), based on the paper Misdemeanor Prosecution <a href="https://doi.org/10.1093/qje/qjad005" class="external-link">(Agan et al., 2023)</a>.<a class="anchor" aria-label="anchor" href="#the-following-code-shows-the-application-of-the-method-in-investigating-the-effect-of-misdemeanor-prosecution-x-on-criminal-complaint-in-two-years-y-based-on-the-paper-misdemeanor-prosecution-agan-et-al-2023"></a>
 </h3>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/minhnngo/mwivhet" class="external-link">mwivhet</a></span><span class="op">)</span></span>
-<span><span class="co"># Demo for judge example without covariates</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://dplyr.tidyverse.org" class="external-link">dplyr</a></span><span class="op">)</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://lrberge.github.io/fixest/" class="external-link">fixest</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Numerator</span></span>
-<span><span class="va">LMnum</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/GetLM_nocov.html">GetLM_nocov</a></span><span class="op">(</span>df <span class="op">=</span> <span class="va">dnc</span>, X <span class="op">=</span> <span class="va">X</span>, e <span class="op">=</span> <span class="va">e</span>, groupZ <span class="op">=</span> <span class="va">group</span><span class="op">)</span></span>
+<span><span class="co"># 0. Setup ----------------------------------------------------------------</span></span>
+<span><span class="va">df</span> <span class="op">&lt;-</span> <span class="va">suffolk</span></span>
 <span></span>
-<span><span class="co"># L3O Variance</span></span>
-<span><span class="va">LMVar</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/L3Ovar_gloop_nocov.html">L3Ovar_gloop_nocov</a></span><span class="op">(</span>df <span class="op">=</span> <span class="va">dnc</span>, group <span class="op">=</span> <span class="va">group</span>, X <span class="op">=</span> <span class="va">X</span>, e <span class="op">=</span> <span class="va">e</span>, MX <span class="op">=</span> <span class="va">MX</span>, Me <span class="op">=</span> <span class="va">Me</span><span class="op">)</span></span>
+<span><span class="co"># 1. Preparation ----------------------------------------------------------</span></span>
+<span><span class="co"># 1.1. Variable Assignment</span></span>
+<span><span class="va">df</span> <span class="op">&lt;-</span> <span class="va">df</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span></span>
+<span>    X <span class="op">=</span> <span class="va">ng_immed_all</span>,</span>
+<span>    Y <span class="op">=</span> <span class="va">anyr_twoyears_arrest2</span>,</span>
+<span>    groupZ <span class="op">=</span> <span class="va">first_pros</span></span>
+<span>  <span class="op">)</span></span>
 <span></span>
-<span><span class="co"># t-statistic for LM test (compare with std normal)</span></span>
-<span><span class="va">LMt</span> <span class="op">&lt;-</span> <span class="va">LMnum</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="va">LMVar</span><span class="op">)</span></span>
+<span><span class="co"># 1.2. Construct Covariate Groups (groupW)</span></span>
+<span><span class="va">df</span> <span class="op">&lt;-</span> <span class="va">df</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span></span>
+<span>    monthID <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/integer.html" class="external-link">as.integer</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">court_month2</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>    dowID   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/integer.html" class="external-link">as.integer</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">court_dow2</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>    groupW  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/integer.html" class="external-link">as.integer</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="va">dowID</span>, <span class="va">monthID</span>, sep <span class="op">=</span> <span class="st">"_"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Confidence Intervals</span></span>
-<span><span class="co"># Get coefficients first, then values</span></span>
-<span><span class="va">CI_coefs</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/GetCIcoef_nocov.html">GetCIcoef_nocov</a></span><span class="op">(</span>df <span class="op">=</span> <span class="va">dnc</span>, groupZ <span class="op">=</span> <span class="va">group</span>, X <span class="op">=</span> <span class="va">X</span>, Y <span class="op">=</span> <span class="va">Y</span>, MX <span class="op">=</span> <span class="va">MX</span>, MY <span class="op">=</span> <span class="va">MY</span><span class="op">)</span></span>
-<span><span class="va">CI</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/GetCIvals.html">GetCIvals</a></span><span class="op">(</span><span class="va">CI_coefs</span><span class="op">)</span></span>
+<span><span class="co"># 1.3. Construct Interaction Groups (groupQ / group)</span></span>
+<span><span class="va">df</span> <span class="op">&lt;-</span> <span class="va">df</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span></span>
+<span>    groupQ <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/integer.html" class="external-link">as.integer</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="va">groupW</span>, <span class="va">groupZ</span>, sep <span class="op">=</span> <span class="st">"_"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>    group  <span class="op">=</span> <span class="va">groupQ</span></span>
+<span>  <span class="op">)</span></span>
 <span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"LM Statistic:"</span>, <span class="va">LMt</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] "LM Statistic: -0.790957868876291"</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="st">"Confidence Interval:"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] "Confidence Interval:"</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">CI</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] -1.9568467  0.4052406</span></span></code></pre></div>
-</div>
-<div class="section level3">
-<h3 id="quarter-of-birth-example-with-covariates-1">Quarter-of-Birth Example with Covariates (1)<a class="anchor" aria-label="anchor" href="#quarter-of-birth-example-with-covariates-1"></a>
-</h3>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Demo for QOB example with covariates</span></span>
+<span><span class="co"># 1.4. Filter for Group Size</span></span>
+<span><span class="va">df</span> <span class="op">&lt;-</span> <span class="va">df</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html" class="external-link">group_by</a></span><span class="op">(</span><span class="va">groupQ</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/context.html" class="external-link">n</a></span><span class="op">(</span><span class="op">)</span> <span class="op">&gt;=</span> <span class="fl">4</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html" class="external-link">ungroup</a></span><span class="op">(</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Numerator</span></span>
-<span><span class="co"># group indexes every QOB and groupW combination</span></span>
-<span><span class="va">LMnum</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/GetLM.html">GetLM</a></span><span class="op">(</span>df <span class="op">=</span> <span class="va">dc</span>, X <span class="op">=</span> <span class="va">X</span>, e <span class="op">=</span> <span class="va">e</span>, groupW <span class="op">=</span> <span class="va">groupW</span>, group <span class="op">=</span> <span class="va">group</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Variance</span></span>
-<span><span class="va">LMVar</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/L3Ovar_gloop_cov.html">L3Ovar_gloop_cov</a></span><span class="op">(</span>df <span class="op">=</span> <span class="va">dc</span>, group <span class="op">=</span> <span class="va">group</span>, groupW <span class="op">=</span> <span class="va">groupW</span>, X <span class="op">=</span> <span class="va">X</span>, e <span class="op">=</span> <span class="va">e</span>, </span>
-<span>                          MX <span class="op">=</span> <span class="va">MX</span>, Me <span class="op">=</span> <span class="va">Me</span><span class="op">)</span></span>
+<span><span class="co"># 1.5. Get residualized objects</span></span>
+<span><span class="va">lmX</span> <span class="op">&lt;-</span> <span class="fu">fixest</span><span class="fu">::</span><span class="fu"><a href="https://lrberge.github.io/fixest/reference/feols.html" class="external-link">feols</a></span><span class="op">(</span><span class="va">X</span><span class="op">~</span><span class="fl">1</span><span class="op">|</span><span class="va">group</span>,data<span class="op">=</span><span class="va">df</span><span class="op">)</span></span>
+<span><span class="va">df</span><span class="op">$</span><span class="va">MX</span> <span class="op">&lt;-</span> <span class="va">lmX</span><span class="op">$</span><span class="va">residuals</span></span>
 <span></span>
-<span><span class="co"># t-statistic for LM test</span></span>
-<span><span class="va">LMt</span> <span class="op">&lt;-</span> <span class="va">LMnum</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="va">LMVar</span><span class="op">)</span></span>
+<span><span class="va">lmY</span> <span class="op">&lt;-</span> <span class="fu">fixest</span><span class="fu">::</span><span class="fu"><a href="https://lrberge.github.io/fixest/reference/feols.html" class="external-link">feols</a></span><span class="op">(</span><span class="va">Y</span><span class="op">~</span><span class="fl">1</span><span class="op">|</span><span class="va">group</span>,data<span class="op">=</span><span class="va">df</span><span class="op">)</span></span>
+<span><span class="va">df</span><span class="op">$</span><span class="va">MY</span> <span class="op">&lt;-</span> <span class="va">lmY</span><span class="op">$</span><span class="va">residuals</span></span>
 <span></span>
-<span><span class="co"># Confidence Intervals (Fast method)</span></span>
-<span><span class="va">CI_coefs</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/GetL3OCIcoef_fast.html">GetL3OCIcoef_fast</a></span><span class="op">(</span>df <span class="op">=</span> <span class="va">dc</span>, groupW <span class="op">=</span> <span class="va">groupW</span>, group <span class="op">=</span> <span class="va">group</span>, X <span class="op">=</span> <span class="va">X</span>, </span>
-<span>                              Y <span class="op">=</span> <span class="va">Y</span>, MX <span class="op">=</span> <span class="va">MX</span>, MY <span class="op">=</span> <span class="va">MY</span><span class="op">)</span></span>
-<span><span class="va">CI</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/GetCIvals.html">GetCIvals</a></span><span class="op">(</span><span class="va">CI_coefs</span><span class="op">)</span></span>
+<span><span class="co"># 2. Inference ------------------------------------------------------------</span></span>
+<span><span class="va">S_hat</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/GetLM.html">GetLM</a></span><span class="op">(</span><span class="va">df</span>, <span class="va">X</span>, <span class="va">X</span>, <span class="va">groupW</span>, <span class="va">group</span>, noisy <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="va">JIVE</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/GetLM.html">GetLM</a></span><span class="op">(</span><span class="va">df</span>, <span class="va">X</span>, <span class="va">Y</span>, <span class="va">groupW</span>, <span class="va">group</span>, noisy <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">/</span><span class="va">S_hat</span> </span>
 <span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"LM Statistic:"</span>, <span class="va">LMt</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] "LM Statistic: 0.503840615057238"</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="st">"Confidence Interval:"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] "Confidence Interval:"</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">CI</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] -0.5115206  0.6889379</span></span></code></pre></div>
-</div>
-<div class="section level3">
-<h3 id="quarter-of-birth-example-with-covariates-2">Quarter-of-Birth Example with Covariates (2)<a class="anchor" aria-label="anchor" href="#quarter-of-birth-example-with-covariates-2"></a>
-</h3>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Demo for QOB example with covariates, using stored G and P. Slower but allows continuous W, Z</span></span>
-<span><span class="co"># Would give the same results as previous example</span></span>
+<span><span class="va">L3OCIcoef</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/GetCIcoef.html">GetCIcoef</a></span><span class="op">(</span><span class="va">df</span>, <span class="va">groupW</span>, <span class="va">group</span>, <span class="va">X</span>, <span class="va">Y</span>, <span class="va">MX</span>, <span class="va">MY</span>, noisy <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="va">L3OCI</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/GetCItypebd.html">GetCItypebd</a></span><span class="op">(</span><span class="va">L3OCIcoef</span><span class="op">)</span><span class="op">[</span><span class="fl">2</span><span class="op">:</span><span class="fl">3</span><span class="op">]</span> </span>
 <span></span>
-<span><span class="co"># Construct G and P using the package function</span></span>
-<span><span class="va">GP</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/GetGP.html">GetGP</a></span><span class="op">(</span>group <span class="op">=</span> <span class="va">dc</span><span class="op">$</span><span class="va">group</span>, groupW <span class="op">=</span> <span class="va">dc</span><span class="op">$</span><span class="va">groupW</span>, n <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">dc</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co"># 3. Table ----------------------------------------------------------------</span></span>
+<span><span class="co"># 3.1. Create the matrix using calculated L3O variables</span></span>
+<span><span class="va">L3O_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>  <span class="va">L3OCI</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span>,                <span class="co"># Lower Bound</span></span>
+<span>  <span class="va">L3OCI</span><span class="op">[</span><span class="fl">2</span><span class="op">]</span>,                <span class="co"># Upper Bound</span></span>
+<span>  <span class="va">JIVE</span>,                    <span class="co"># Point Estimate</span></span>
+<span>  <span class="va">L3OCI</span><span class="op">[</span><span class="fl">2</span><span class="op">]</span> <span class="op">-</span> <span class="va">L3OCI</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span>      <span class="co"># CI Length</span></span>
+<span><span class="op">)</span>, ncol <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Numerator</span></span>
-<span><span class="co"># Note: as.numeric ensures it returns a scalar, not a 1x1 matrix</span></span>
-<span><span class="va">LMnum</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/t.html" class="external-link">t</a></span><span class="op">(</span><span class="va">dc</span><span class="op">$</span><span class="va">e</span><span class="op">)</span> <span class="op"><a href="https://rdrr.io/r/base/matmult.html" class="external-link">%*%</a></span> <span class="va">GP</span><span class="op">$</span><span class="va">G</span> <span class="op"><a href="https://rdrr.io/r/base/matmult.html" class="external-link">%*%</a></span> <span class="va">dc</span><span class="op">$</span><span class="va">X</span><span class="op">)</span></span>
+<span><span class="co"># 3.2. Add labels for row/col</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">L3O_data</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"LB"</span>, <span class="st">"UB"</span>, <span class="st">"Estimate"</span>, <span class="st">"CIlength"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">L3O_data</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="st">"L3O"</span></span>
 <span></span>
-<span><span class="co"># L3O Variance</span></span>
-<span><span class="va">LMVar</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/L3Ovar_iloop_cov.html">L3Ovar_iloop_cov</a></span><span class="op">(</span>X <span class="op">=</span> <span class="va">dc</span><span class="op">$</span><span class="va">X</span>, e <span class="op">=</span> <span class="va">dc</span><span class="op">$</span><span class="va">e</span>, P <span class="op">=</span> <span class="va">GP</span><span class="op">$</span><span class="va">P</span>, G <span class="op">=</span> <span class="va">GP</span><span class="op">$</span><span class="va">G</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># t-statistic</span></span>
-<span><span class="va">LMt</span> <span class="op">&lt;-</span> <span class="va">LMnum</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="va">LMVar</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Confidence Intervals</span></span>
-<span><span class="va">CI_coefs</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/GetCIcoef_iloop.html">GetCIcoef_iloop</a></span><span class="op">(</span>df <span class="op">=</span> <span class="va">dc</span>, P <span class="op">=</span> <span class="va">GP</span><span class="op">$</span><span class="va">P</span>, G <span class="op">=</span> <span class="va">GP</span><span class="op">$</span><span class="va">G</span>, X <span class="op">=</span> <span class="va">X</span>, Y <span class="op">=</span> <span class="va">Y</span>, MX <span class="op">=</span> <span class="va">MX</span>, </span>
-<span>                            MY <span class="op">=</span> <span class="va">MY</span>, Z <span class="op">=</span> <span class="va">GP</span><span class="op">$</span><span class="va">Z</span>, W <span class="op">=</span> <span class="va">GP</span><span class="op">$</span><span class="va">W</span>, noisy <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="va">CI</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/GetCIvals.html">GetCIvals</a></span><span class="op">(</span><span class="va">CI_coefs</span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"LM Statistic:"</span>, <span class="va">LMt</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] "LM Statistic: 0.503840615057238"</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="st">"Confidence Interval:"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] "Confidence Interval:"</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">CI</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] -0.5115206  0.6889379</span></span></code></pre></div>
+<span><span class="co"># 3.3 Round and save</span></span>
+<span><span class="va">CItab_L3O_round</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">L3O_data</span>, <span class="fl">3</span><span class="op">)</span></span>
+<span><span class="va">CItab_L3O_round</span></span>
+<span><span class="co">#&gt;             L3O</span></span>
+<span><span class="co">#&gt; LB       -0.222</span></span>
+<span><span class="co">#&gt; UB       -0.066</span></span>
+<span><span class="co">#&gt; Estimate -0.144</span></span>
+<span><span class="co">#&gt; CIlength  0.155</span></span></code></pre></div>
 </div>
 </div>
 </div>
