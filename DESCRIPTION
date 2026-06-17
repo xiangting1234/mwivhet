@@ -9,11 +9,15 @@ Authors@R: c(
     person(given = "Luther", family = "Yap",
            email = "lyap@nus.edu.sg",
            role = "aut",
-           comment = "Original method and code implementation"))
+           comment = "Original method and code implementation"),
+    person(given = "Xiang Ting", family = "Ng",
+           email = "ngxiangting@u.nus.edu",
+           role = "ctb",
+           comment = "Package development and documentation"))
 Description: Calculate test statistics and confidence intervals in a linear
     instrumental variables model with possibly many weak instruments and
     heterogeneous treatment effects, using methods developed in
-    Yap (2025) <https://arxiv.org/abs/2408.11193>. Implements a novel score
+    Yap (2025) <https://arxiv.org/abs/2408.1193>. Implements a novel score
     statistic and a leave-three-out variance estimator that is asymptotically
     uniformly most powerful unbiased. Also computes Lagrange Multiplier tests for
     robust inference in the presence of high-dimensional covariates.
